@@ -3,6 +3,6 @@ scikit-learn
 joblib
 sentence-transformers
 pandas
-matplotlib
+plotly
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch
