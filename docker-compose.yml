@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+      - ./model_cache:/app/model_cache  # Persists the transformer model
+    deploy:
+      resources:
+        limits:
+          memory: 3G  # Increased to 3G for safety 
