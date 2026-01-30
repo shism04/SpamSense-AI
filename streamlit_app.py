@@ -92,7 +92,7 @@ def render_dashboard(batch_df, features_df):
     st.divider()
 
     # ── Distribution ─────────────────────────
-    c1, c2 = st.columns([1, 2])
+    c1, c2 = st.columns([1, 2], vertical_alignment="center", gap="medium")
 
     with c1:
         fig = px.pie(
@@ -106,7 +106,7 @@ def render_dashboard(batch_df, features_df):
         st.plotly_chart(fig, use_container_width=True)
 
     with c2:
-        st.markdown("### Email Classification Results")
+        st.write("Email Classification Results")
 
         table_df = batch_df.copy()
         table_df["confidence"] = (table_df["confidence"] * 100).round(2).astype(str) + "%"
@@ -118,7 +118,7 @@ def render_dashboard(batch_df, features_df):
     st.divider()
 
     # ── Header Anomaly Indicators & Subject length vs Model confidence ─────────────
-    c1, c2 = st.columns([1, 2])
+    c1, c2 = st.columns([1, 2], vertical_alignment="center", gap="medium")
     with c1:
         anomaly_cols = [
             "from_returnpath_match",
@@ -154,7 +154,7 @@ def render_dashboard(batch_df, features_df):
     st.divider()
 
     # ── Routing & Content ─────────────────────
-    c1, c2 = st.columns(2)
+    c1, c2 = st.columns(2, vertical_alignment="center", gap="medium")
 
     with c1:
         routing_df = features_df[
@@ -198,24 +198,11 @@ with st.sidebar:
     """)
 
 # ───────── HERO SECTION ─────────
-c1, c2 = st.columns(2)
-
-with c1:
-    st.markdown(
-        """
-        <div style="justify-content:center; text-align: center; margin-bottom: 40px;">
-            <h1 style="font-size: 3rem; font-weight: 700; color:white;">SpamSense AI 📧</h1>
-            <p style="font-size: 1.2rem; color:#4b5563; max-width:700px; margin:auto;">
-                SpamSense AI is an intelligent email forensic tool that detects SPAM and analyzes emails in detail.
-                It uses advanced machine learning and semantic embeddings to identify suspicious patterns in headers and content.
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-with c2:
-    st.image("images/spamsense_ai_2.png", width="content")
+with st.container(horizontal_alignment="center"):
+    st.title("SpamSense AI 📧", text_alignment="center")
+    st.text("SpamSense AI is an intelligent email forensic tool that detects SPAM and analyzes emails in detail.\n It uses advanced machine learning and semantic embeddings to identify suspicious patterns in headers and content." , text_alignment="center")
+    #st.text("It uses advanced machine learning and semantic embeddings to identify suspicious patterns in headers and content.", text_alignment="center")
+    st.image("images/spamsense_ai_2.png")
 
 tab1, tab2 = st.tabs(["Single Email", "Batch Analysis"])
 
