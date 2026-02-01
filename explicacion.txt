@@ -1,0 +1,218 @@
+Explicación super detallada de streamlit_app.py
+=============================================
+
+1) IMPORTS Y DEPENDENCIAS
+-------------------------
+- streamlit as st:
+  Framework principal para construir la interfaz web. Provee widgets, layouts
+  y gestión de estado.
+- joblib:
+  Carga el modelo entrenado de clasificación (archivo .pkl).
+- pandas as pd:
+  Manipulación de datos tabulares (DataFrames) para resultados y features.
+- plotly.express / plotly.graph_objects:
+  Librerías para gráficos interactivos (pie, histograma, scatter, box, barras).
+- SentenceTransformer:
+  Modelo de embeddings para convertir texto en vectores numéricos.
+- EmailProcessor:
+  Clase propia que extrae características técnicas del email raw.
+- styles (COLORS, apply_custom_styles):
+  Define paleta de colores y aplica CSS personalizado.
+- components (metric_card, result_card_html, hero_banner, sidebar_info):
+  Componentes UI reutilizables (tarjetas, banner, panel lateral).
+
+2) CONFIGURACIÓN DE LA APP
+--------------------------
+st.set_page_config(...) define:
+- title: "SpamSense AI"
+- icono: 📧
+- layout: wide (ancho)
+
+apply_custom_styles() inyecta estilos personalizados para la UI.
+
+3) CARGA DE MODELOS (CACHEADA)
+------------------------------
+@st.cache_resource evita recargar modelos en cada interacción.
+load_assets():
+- spam_model = joblib.load("model/spam_model.pkl")
+- emb_model = SentenceTransformer("all-mpnet-base-v2", cache_folder="./model_cache")
+Retorna ambos modelos.
+
+Luego:
+spam_model, emb_model = load_assets()
+processor = EmailProcessor(emb_model)
+
+EmailProcessor usa el modelo de embeddings para generar features desde el email.
+
+4) FUNCIÓN render_dashboard(batch_df, features_df)
+--------------------------------------------------
+Objetivo: construir un panel forense con KPIs, gráficos y tablas.
+Parámetros:
+- batch_df: resultados (label, confidence, subject_length, name)
+- features_df: features técnicos extraídos por EmailProcessor
+
+4.1 Validación inicial:
+Si batch_df o features_df están vacíos:
+- st.info("No data available...") y termina la función.
+
+4.2 KPIs:
+- total: número total de emails
+- spam: cantidad con label "SPAM"
+- ham: total - spam
+- avg_conf: promedio de confidence
+- spam_rate: porcentaje de spam
+
+Se muestran en 5 tarjetas (metric_card) con íconos y colores.
+
+4.3 Visualizaciones principales:
+Columna izquierda:
+- Pie/Donut chart con distribución SPAM/HAM.
+- Colores definidos en COLORS.
+Columna derecha:
+- Histograma doble (SPAM vs HAM) de la confianza.
+
+4.4 Tabla detallada:
+- Copia batch_df a display_df
+- confidence se convierte a porcentaje string.
+- Renombra columnas:
+  name -> Email File
+  label -> Classification
+  confidence -> Confidence
+  subject_length -> Subject Length
+- Se muestra con st.dataframe, con ayudas (help).
+
+4.5 Análisis avanzado:
+- Scatter plot: subject_length vs confidence, coloreado por label.
+- Box plot: distribución de confidence por clase (SPAM/HAM).
+
+4.6 Análisis de features técnicos:
+Tres columnas con barras horizontales/verticales:
+
+A) Header Anomalies:
+- Return-Path Mismatch
+- Reply-To Differs
+- Missing Message-ID
+- Random Message-ID
+Se muestra la tasa promedio.
+
+B) Routing Indicators:
+- Avg Received Headers
+- Private IP Rate
+Promedios en barras.
+
+C) Content Structure:
+- % HTML Content
+- % Multipart Content
+Promedios en barras.
+
+5) UI PRINCIPAL
+---------------
+Sidebar:
+with st.sidebar: sidebar_info()
+
+Banner superior:
+hero_banner()
+
+Tabs:
+tab1 = "Single Email Analysis"
+tab2 = "Batch Analysis"
+
+6) TAB 1: SINGLE EMAIL ANALYSIS
+-------------------------------
+- Texto de ayuda: pegar email completo RFC 822.
+- st.text_area para contenido raw.
+- Botón “Analyze Email”.
+
+Flujo al presionar el botón:
+1. Si raw está vacío -> warning.
+2. Si hay contenido:
+   - processor.transform_raw_email(raw) -> DataFrame de features.
+   - pred = spam_model.predict(df)[0]
+   - prob = spam_model.predict_proba(df)[0][pred]
+   - label = "SPAM" si pred=1, si no "HAM".
+   - color según label.
+   - Renderiza card de resultado con result_card_html.
+   - Expander con detalles técnicos (df.T).
+
+Errores se capturan con try/except -> st.error.
+
+7) TAB 2: BATCH ANALYSIS
+------------------------
+- Subida múltiple de archivos .eml o .txt.
+- Botón “Generate Report” (deshabilitado si no hay archivos).
+
+Al ejecutar:
+- Inicializa results y all_features.
+- Barra de progreso y texto de estado.
+- Por cada archivo:
+  - Lee bytes -> decode utf-8 (con replace).
+  - Normaliza saltos de línea.
+  - Extrae features con processor.
+  - Predice label y confidence.
+  - Guarda: name, label, confidence, subject_length.
+  - Guarda features en all_features.
+- Limpia barra y estado.
+- Si hay resultados:
+  - st.success
+  - render_dashboard(pd.DataFrame(results), pd.concat(all_features))
+- Si no hay resultados:
+  - st.error
+
+8) FLUJO GENERAL DE DATOS
+-------------------------
+1. Usuario ingresa email(s).
+2. EmailProcessor extrae features técnicos.
+3. Modelo spam_model clasifica y calcula confianza.
+4. Se muestran resultados inmediatos o dashboard completo.
+
+9) GLOSARIO DE INGLÉS Y TECNICISMOS
+-----------------------------------
+Palabras en inglés:
+- Framework: conjunto de herramientas/librerías para construir aplicaciones.
+- Layout: distribución visual de los elementos en pantalla.
+- Model / Models: modelo matemático entrenado para predecir.
+- Cache / Cacheada: memoria temporal para reutilizar resultados y acelerar.
+- Resource: recurso (modelo, conexión, objeto pesado).
+- Dashboard: panel de control con métricas y gráficos.
+- KPI (Key Performance Indicator): indicador clave de rendimiento.
+- Spam / Ham: correo no deseado / correo legítimo.
+- Avg (Average): promedio.
+- Confidence: nivel de confianza de la predicción.
+- Batch: lote (procesamiento de varios archivos a la vez).
+- Upload / Uploader: subir archivos.
+- Raw: contenido original sin procesar.
+- Parse / Parsing: analizar y extraer partes del texto.
+- Feature(s): característica(s) numérica(s) usada(s) por el modelo.
+- Header: cabecera del email (From, To, Subject, etc.).
+- Reply-To: cabecera con dirección de respuesta.
+- Message-ID: identificador único del email.
+- Return-Path: dirección real usada para devoluciones.
+- Routing: ruta que siguió el email por servidores.
+- Received: cabecera que registra saltos del email.
+- HTML: formato de email con etiquetas (texto enriquecido).
+- Multipart: email con varias partes (texto + HTML + adjuntos).
+- Plot: gráfico.
+- Scatter plot: gráfico de dispersión (puntos).
+- Box plot: gráfico de caja (medianas y dispersión).
+- Histogram: histograma (distribución de frecuencias).
+- Pie chart: gráfico de pastel.
+- Donut chart: gráfico de pastel con agujero.
+- Label: etiqueta de clase (SPAM/HAM).
+- Predict: predecir.
+- Probability / Proba: probabilidad.
+- Tab: pestaña.
+- Sidebar: panel lateral.
+- Hero banner: cabecera visual destacada.
+- Card: tarjeta informativa visual.
+- Progress bar: barra de progreso.
+
+Tecnicismos profesionales:
+- RFC 822: estándar que define el formato de los emails (headers + body).
+- Embeddings: vectores numéricos que representan texto en un espacio matemático.
+- DataFrame: tabla de datos en memoria (filas y columnas).
+- Classifier: modelo que asigna una clase (SPAM/HAM).
+- Predict_proba: método que devuelve probabilidad por clase.
+- Vectorizar: convertir texto en números para el modelo.
+- Feature extraction: proceso de extraer variables útiles del texto.
+- UX/UI: experiencia de usuario / interfaz de usuario.
+- Decode (utf-8): convertir bytes a texto usando una codificación.
