@@ -109,7 +109,7 @@ def sidebar_info():
         # Instructions Section
         st.markdown(
             """
-            <h3 style="color: #FFFFFF;">📖 Instructions</h3>
+            <h3>📖 Instructions</h3>
             <div class="info-card">
                 <strong>How to get Raw Email Source:</strong><br><br>
                 1. Open email in Gmail/Outlook<br>
@@ -125,7 +125,7 @@ def sidebar_info():
         # About Section
         st.markdown(
             """
-            <h3 style="color: #FFFFFF;">ℹ️ About</h3>
+            <h3>ℹ️ About</h3>
             <div class="info-card">
                 <strong>SpamSense AI</strong> uses advanced machine learning and semantic analysis to detect spam with high precision.<br><br>
                 <strong>Features:</strong>
