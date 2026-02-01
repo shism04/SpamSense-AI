@@ -23,10 +23,6 @@ CUSTOM_CSS = """
     font-family: 'Inter', sans-serif;
 }
 
-[data-testid="stAppViewContainer"] {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
 .main .block-container {
     padding-top: 2rem;
     max-width: 1400px;
@@ -50,13 +46,11 @@ CUSTOM_CSS = """
 
 /* Títulos con mejor contraste */
 h1, h2, h3, h4 {
-    color: #1E293B !important;
     font-weight: 700 !important;
 }
 
 /* Hero Section */
 .hero-gradient {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     padding: 3rem 2rem;
     border-radius: 20px;
     text-align: center;
@@ -67,17 +61,26 @@ h1, h2, h3, h4 {
 .hero-title {
     font-size: 3rem;
     font-weight: 800;
-    color: #FFFFFF !important;
     margin-bottom: 1rem;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
 }
 
 .hero-subtitle {
     font-size: 1.1rem;
-    color: #F1F5F9 !important;
     max-width: 700px;
     margin: 0 auto;
     line-height: 1.6;
+}
+
+/* SideBar Info Cards */
+.info-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-weight: 500;
+    border-radius: 8px;
+    padding: 1.2rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
 
 /* Metric Cards */
@@ -116,7 +119,7 @@ h1, h2, h3, h4 {
     background: white;
     padding: 2rem;
     border-radius: 16px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+    box-shadow: 5px 0px 10px 2px rgba(0, 0, 0, 0.1);
     border-left: 6px solid var(--result-color);
     margin: 1rem 0;
 }
@@ -127,7 +130,6 @@ h1, h2, h3, h4 {
     border-radius: 50px;
     font-weight: 700;
     font-size: 1rem;
-    color: white;
     background: var(--badge-color);
     box-shadow: 0 4px 12px var(--badge-shadow);
 }
@@ -171,7 +173,6 @@ h1, h2, h3, h4 {
 /* Buttons */
 button[kind="primary"] {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-    color: white !important;
     font-weight: 600 !important;
     border: none !important;
     border-radius: 8px !important;
@@ -185,7 +186,6 @@ button[kind="primary"]:hover {
 
 /* File Uploader */
 [data-testid="stFileUploadDropzone"] {
-    background: white;
     border: 2px dashed #CBD5E1;
     border-radius: 12px;
 }
