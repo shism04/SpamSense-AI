@@ -105,25 +105,37 @@ def hero_banner():
 
 def sidebar_info():
     """Renderiza información en el sidebar"""
-    st.markdown("### 📖 Instructions")
-    st.info("""
-    **How to get Raw Email Source:**
-    
-    1. Open email in Gmail/Outlook
-    2. Click 'More' (⋮) menu
-    3. Select 'Show Original' or 'View Message Source'
-    4. Copy entire text or download .eml file
-    5. Paste here or upload file
-    """)
-    
-    st.markdown("---")
-    st.markdown("### ℹ️ About")
-    st.markdown("""
-    **SpamSense AI** uses advanced machine learning and semantic analysis to detect spam emails with high precision.
-    
-    **Features:**
-    - RFC 822 header analysis
-    - Semantic content evaluation
-    - Routing anomaly detection
-    - Confidence scoring
-    """)
+    with st.sidebar:
+        # Instructions Section
+        st.markdown(
+            """
+            <h3>📖 Instructions</h3>
+            <div class="info-card">
+                <strong>How to get Raw Email Source:</strong><br><br>
+                1. Open email in Gmail/Outlook<br>
+                2. Click 'More' (⋮) menu<br>
+                3. Select 'Show Original' or 'View Source'<br>
+                4. Copy entire text or download .eml<br>
+                5. Paste here or upload file
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        # About Section
+        st.markdown(
+            """
+            <h3>ℹ️ About</h3>
+            <div class="info-card">
+                <strong>SpamSense AI</strong> uses advanced machine learning and semantic analysis to detect spam with high precision.<br><br>
+                <strong>Features:</strong>
+                <ul style="margin-left: -20px;">
+                    <li>RFC 822 header analysis</li>
+                    <li>Semantic evaluation</li>
+                    <li>Routing anomaly detection</li>
+                    <li>Confidence scoring</li>
+                </ul>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
