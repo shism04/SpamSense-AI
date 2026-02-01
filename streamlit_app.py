@@ -2,8 +2,13 @@ import streamlit as st
 import joblib
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from sentence_transformers import SentenceTransformer
 from emailProcessor import EmailProcessor
+
+# Importar módulos de estilos y componentes
+from styles import COLORS, apply_custom_styles
+from components import metric_card, result_card_html, hero_banner, sidebar_info
 
 # ───────────────── CONFIG ─────────────────
 st.set_page_config(
@@ -12,51 +17,8 @@ st.set_page_config(
     layout="wide"
 )
 
-COLORS = {
-    "SPAM": "#FF3860",
-    "HAM": "#23D160",
-    "PRIMARY": "#3475B3"
-}
-
-# ───────────────── STYLES ─────────────────
-st.markdown("""
-<style>
-body {
-    background-color: #f5f7fa;
-}
-.kpi-card {
-    background: white;
-    border-radius: 14px;
-    padding: 20px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-    border-left: 6px solid var(--accent);
-}
-.kpi-label {
-    font-size: 0.9rem;
-    color: #6b7280;
-}
-.kpi-value {
-    font-size: 1.9rem;
-    font-weight: 700;
-    color: #111827;
-}
-.center-table {
-    display: flex;
-    justify-content: center;
-}
-</style>
-""", unsafe_allow_html=True)
-
-def kpi_card(label, value, accent):
-    st.markdown(
-        f"""
-        <div class="kpi-card" style="--accent:{accent}">
-            <div class="kpi-label">{label}</div>
-            <div class="kpi-value">{value}</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+# Aplicar estilos personalizados
+apply_custom_styles()
 
 # ───────────────── MODELS ─────────────────
 @st.cache_resource
@@ -73,181 +35,425 @@ processor = EmailProcessor(emb_model)
 
 # ───────────────── DASHBOARD ─────────────────
 def render_dashboard(batch_df, features_df):
-    st.markdown(
-        "<h2 style='margin-bottom: 30px;'>Overview</h2>",
-        unsafe_allow_html=True
-    )
+    st.markdown("## 📊 Forensic Analysis Dashboard")
+    st.markdown("---")
 
+    # KPIs
     total = len(batch_df)
     spam = (batch_df["label"] == "SPAM").sum()
     ham = total - spam
-    avg_conf = batch_df["confidence"].mean() * 100
+    avg_conf = batch_df["confidence"].mean()
+    spam_rate = (spam / total * 100) if total > 0 else 0
 
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: kpi_card("Emails Analyzed", total, COLORS["PRIMARY"])
-    with c2: kpi_card("Spam Detected", spam, COLORS["SPAM"])
-    with c3: kpi_card("Legitimate Emails", ham, COLORS["HAM"])
-    with c4: kpi_card("Avg Model Confidence", f"{avg_conf:.1f}%", COLORS["PRIMARY"])
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1:
+        metric_card("Total Emails", total, COLORS["PRIMARY"], "📧")
+    with col2:
+        metric_card("Spam Detected", spam, COLORS["SPAM"], "⚠️")
+    with col3:
+        metric_card("Legitimate", ham, COLORS["HAM"], "✅")
+    with col4:
+        metric_card("Spam Rate", f"{spam_rate:.1f}%", COLORS["ACCENT"], "📈")
+    with col5:
+        metric_card("Avg Confidence", f"{avg_conf:.1%}", COLORS["SECONDARY"], "🎯")
 
-    st.divider()
+    st.markdown("---")
 
-    # ── Distribution ─────────────────────────
-    c1, c2 = st.columns([1, 2], vertical_alignment="center", gap="medium")
+    # Visualizaciones principales
+    col1, col2 = st.columns([1, 1])
 
-    with c1:
-        fig = px.pie(
-            batch_df,
-            names="label",
-            hole=0.55,
-            color="label",
-            color_discrete_map=COLORS,
-            title="Spam vs Legitimate Distribution"
+    with col1:
+        # Pie chart mejorado
+        fig = go.Figure(data=[go.Pie(
+            labels=batch_df['label'].value_counts().index,
+            values=batch_df['label'].value_counts().values,
+            hole=0.6,
+            marker=dict(colors=[COLORS["HAM"], COLORS["SPAM"]]),
+            textinfo='label+percent',
+            textfont=dict(size=14, color='white', family='Inter'),
+            hovertemplate='<b>%{label}</b><br>Count: %{value}<br>Percentage: %{percent}<extra></extra>'
+        )])
+        
+        fig.update_layout(
+            title=dict(
+                text="<b>Email Classification Distribution</b>",
+                font=dict(size=18, color='#1E293B', family='Inter')
+            ),
+            showlegend=True,
+            legend=dict(font=dict(size=13, color='#1E293B')),
+            height=350,
+            paper_bgcolor='white',
+            plot_bgcolor='white'
         )
         st.plotly_chart(fig, use_container_width=True)
 
-    with c2:
-        st.write("Email Classification Results")
-
-        table_df = batch_df.copy()
-        table_df["confidence"] = (table_df["confidence"] * 100).round(2).astype(str) + "%"
-
-        st.markdown("<div class='center-table'>", unsafe_allow_html=True)
-        st.dataframe(table_df, hide_index=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    st.divider()
-
-    # ── Header Anomaly Indicators & Subject length vs Model confidence ─────────────
-    c1, c2 = st.columns([1, 2], vertical_alignment="center", gap="medium")
-    with c1:
-        anomaly_cols = [
-            "from_returnpath_match",
-            "reply_to_differs_from_from",
-            "message_id_missing",
-            "message_id_is_random"
-        ]
-
-        anomaly_df = features_df[anomaly_cols].mean().reset_index()
-        anomaly_df.columns = ["Indicator", "Activation Rate"]
-
-        fig = px.bar(
-            anomaly_df,
-            x="Activation Rate",
-            y="Indicator",
-            orientation="h",
-            title="Header Anomaly Indicators",
-            color_discrete_sequence=[COLORS["PRIMARY"]]
+    with col2:
+        # Histograma de confianza
+        fig = go.Figure()
+        
+        spam_data = batch_df[batch_df['label'] == 'SPAM']['confidence']
+        ham_data = batch_df[batch_df['label'] == 'HAM']['confidence']
+        
+        fig.add_trace(go.Histogram(
+            x=spam_data,
+            name='SPAM',
+            marker_color=COLORS["SPAM"],
+            opacity=0.7,
+            nbinsx=20
+        ))
+        
+        fig.add_trace(go.Histogram(
+            x=ham_data,
+            name='HAM',
+            marker_color=COLORS["HAM"],
+            opacity=0.7,
+            nbinsx=20
+        ))
+        
+        fig.update_layout(
+            title=dict(
+                text="<b>Confidence Score Distribution</b>",
+                font=dict(size=18, color='#1E293B', family='Inter')
+            ),
+            xaxis=dict(
+                title=dict(text="<b>Confidence Score</b>", font=dict(size=14, color='#1E293B')),
+                tickfont=dict(size=12, color='#334155'),
+                gridcolor='#E2E8F0',
+                showgrid=True
+            ),
+            yaxis=dict(
+                title=dict(text="<b>Count</b>", font=dict(size=14, color='#1E293B')),
+                tickfont=dict(size=12, color='#334155'),
+                gridcolor='#E2E8F0',
+                showgrid=True
+            ),
+            barmode='overlay',
+            height=350,
+            paper_bgcolor='white',
+            plot_bgcolor='white',
+            legend=dict(font=dict(size=13, color='#1E293B'))
         )
         st.plotly_chart(fig, use_container_width=True)
 
-    with c2:
+    st.markdown("---")
+
+    # Tabla de resultados mejorada
+    st.markdown("### 📋 Detailed Results")
+    
+    display_df = batch_df.copy()
+    display_df['confidence'] = (display_df['confidence'] * 100).round(1).astype(str) + '%'
+    display_df = display_df.rename(columns={
+        'name': 'Email File',
+        'label': 'Classification',
+        'confidence': 'Confidence',
+        'subject_length': 'Subject Length'
+    })
+    
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Classification": st.column_config.TextColumn(
+                "Classification",
+                help="Email classification result"
+            ),
+            "Confidence": st.column_config.TextColumn(
+                "Confidence",
+                help="Model confidence score"
+            )
+        }
+    )
+
+    st.markdown("---")
+
+    # Análisis avanzado
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # Scatter plot mejorado
         fig = px.scatter(
             batch_df,
-            x="subject_length",
-            y="confidence",
-            color="label",
-            color_discrete_map=COLORS,
-            title="Subject Length vs Model Confidence"
+            x='subject_length',
+            y='confidence',
+            color='label',
+            color_discrete_map={"SPAM": COLORS["SPAM"], "HAM": COLORS["HAM"]},
+            size=[10]*len(batch_df),
+            title="<b>Subject Length vs Confidence</b>"
+        )
+        
+        fig.update_layout(
+            title=dict(font=dict(size=18, color='#1E293B', family='Inter')),
+            xaxis=dict(
+                title=dict(text="<b>Subject Length (characters)</b>", font=dict(size=14, color='#1E293B')),
+                tickfont=dict(size=12, color='#334155'),
+                gridcolor='#E2E8F0',
+                showgrid=True
+            ),
+            yaxis=dict(
+                title=dict(text="<b>Confidence Score</b>", font=dict(size=14, color='#1E293B')),
+                tickfont=dict(size=12, color='#334155'),
+                gridcolor='#E2E8F0',
+                showgrid=True
+            ),
+            height=400,
+            paper_bgcolor='white',
+            plot_bgcolor='white',
+            legend=dict(
+                title=dict(text="<b>Classification</b>", font=dict(size=13, color='#1E293B')),
+                font=dict(size=12, color='#1E293B')
+            )
         )
         st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        # Box plot de confianza por categoría
+        fig = go.Figure()
+        
+        fig.add_trace(go.Box(
+            y=batch_df[batch_df['label'] == 'SPAM']['confidence'],
+            name='SPAM',
+            marker_color=COLORS["SPAM"],
+            boxmean='sd'
+        ))
+        
+        fig.add_trace(go.Box(
+            y=batch_df[batch_df['label'] == 'HAM']['confidence'],
+            name='HAM',
+            marker_color=COLORS["HAM"],
+            boxmean='sd'
+        ))
+        
+        fig.update_layout(
+            title=dict(
+                text="<b>Confidence Distribution by Category</b>",
+                font=dict(size=18, color='#1E293B', family='Inter')
+            ),
+            xaxis=dict(
+                tickfont=dict(size=12, color='#334155'),
+                showgrid=False
+            ),
+            yaxis=dict(
+                title=dict(text="<b>Confidence Score</b>", font=dict(size=14, color='#1E293B')),
+                tickfont=dict(size=12, color='#334155'),
+                gridcolor='#E2E8F0',
+                showgrid=True
+            ),
+            height=400,
+            paper_bgcolor='white',
+            plot_bgcolor='white',
+            legend=dict(font=dict(size=12, color='#1E293B'))
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("---")
+
+    # Análisis de características técnicas
+    st.markdown("### 🔍 Technical Feature Analysis")
     
-    st.divider()
+    col1, col2, col3 = st.columns(3)
 
-    # ── Routing & Content ─────────────────────
-    c1, c2 = st.columns(2, vertical_alignment="center", gap="medium")
-
-    with c1:
-        routing_df = features_df[
-            ["num_received_headers", "received_first_ip_is_private"]
-        ].mean().reset_index()
-        routing_df.columns = ["Signal", "Average"]
-
-        fig = px.bar(
-            routing_df,
-            x="Average",
-            y="Signal",
-            orientation="h",
-            title="Routing Suspicion Signals",
-            color_discrete_sequence=[COLORS["PRIMARY"]]
+    with col1:
+        # Anomalías de headers
+        anomaly_data = {
+            'Return-Path Mismatch': features_df['from_returnpath_match'].mean(),
+            'Reply-To Differs': features_df['reply_to_differs_from_from'].mean(),
+            'Missing Message-ID': features_df['message_id_missing'].mean(),
+            'Random Message-ID': features_df['message_id_is_random'].mean()
+        }
+        
+        fig = go.Figure(data=[go.Bar(
+            x=list(anomaly_data.values()),
+            y=list(anomaly_data.keys()),
+            orientation='h',
+            marker=dict(color=COLORS["ACCENT"]),
+            text=[f'{v:.2%}' for v in anomaly_data.values()],
+            textposition='outside',
+            textfont=dict(size=11, color='#1E293B')
+        )])
+        
+        fig.update_layout(
+            title=dict(
+                text="<b>Header Anomalies</b>",
+                font=dict(size=16, color='#1E293B', family='Inter')
+            ),
+            xaxis=dict(
+                title=dict(text="<b>Detection Rate</b>", font=dict(size=13, color='#1E293B')),
+                tickfont=dict(size=11, color='#334155'),
+                gridcolor='#E2E8F0',
+                showgrid=True
+            ),
+            yaxis=dict(
+                tickfont=dict(size=11, color='#334155'),
+                showgrid=False
+            ),
+            height=300,
+            paper_bgcolor='white',
+            plot_bgcolor='white',
+            margin=dict(l=20, r=20, t=40, b=40)
         )
         st.plotly_chart(fig, use_container_width=True)
 
-    with c2:
-        content_df = features_df[["is_html", "is_multipart"]].mean().reset_index()
-        content_df.columns = ["Content Type", "Usage Rate"]
+    with col2:
+        # Routing signals
+        routing_data = pd.DataFrame({
+            'Metric': ['Avg Received Headers', 'Private IP Rate'],
+            'Value': [
+                features_df['num_received_headers'].mean(),
+                features_df['received_first_ip_is_private'].mean()
+            ]
+        })
+        
+        fig = go.Figure(data=[go.Bar(
+            x=routing_data['Metric'],
+            y=routing_data['Value'],
+            marker=dict(color=COLORS["SECONDARY"]),
+            text=[f'{v:.2f}' for v in routing_data['Value']],
+            textposition='outside',
+            textfont=dict(size=11, color='#1E293B')
+        )])
+        
+        fig.update_layout(
+            title=dict(
+                text="<b>Routing Indicators</b>",
+                font=dict(size=16, color='#1E293B', family='Inter')
+            ),
+            xaxis=dict(
+                tickfont=dict(size=11, color='#334155'),
+                showgrid=False
+            ),
+            yaxis=dict(
+                title=dict(text="<b>Average Value</b>", font=dict(size=13, color='#1E293B')),
+                tickfont=dict(size=11, color='#334155'),
+                gridcolor='#E2E8F0',
+                showgrid=True
+            ),
+            height=300,
+            paper_bgcolor='white',
+            plot_bgcolor='white',
+            margin=dict(l=20, r=20, t=40, b=40)
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
-        fig = px.bar(
-            content_df,
-            x="Content Type",
-            y="Usage Rate",
-            title="Content Structure Usage",
-            color_discrete_sequence=[COLORS["PRIMARY"]]
+    with col3:
+        # Content structure
+        content_data = pd.DataFrame({
+            'Type': ['HTML Content', 'Multipart Content'],
+            'Percentage': [
+                features_df['is_html'].mean() * 100,
+                features_df['is_multipart'].mean() * 100
+            ]
+        })
+        
+        fig = go.Figure(data=[go.Bar(
+            x=content_data['Type'],
+            y=content_data['Percentage'],
+            marker=dict(color=COLORS["PRIMARY"]),
+            text=[f'{v:.1f}%' for v in content_data['Percentage']],
+            textposition='outside',
+            textfont=dict(size=11, color='#1E293B')
+        )])
+        
+        fig.update_layout(
+            title=dict(
+                text="<b>Content Structure</b>",
+                font=dict(size=16, color='#1E293B', family='Inter')
+            ),
+            xaxis=dict(
+                tickfont=dict(size=11, color='#334155'),
+                showgrid=False
+            ),
+            yaxis=dict(
+                title=dict(text="<b>Usage Rate (%)</b>", font=dict(size=13, color='#1E293B')),
+                tickfont=dict(size=11, color='#334155'),
+                gridcolor='#E2E8F0',
+                showgrid=True
+            ),
+            height=300,
+            paper_bgcolor='white',
+            plot_bgcolor='white',
+            margin=dict(l=20, r=20, t=40, b=40)
         )
         st.plotly_chart(fig, use_container_width=True)
 
 # ───────────────── UI ─────────────────
-# _____________SIDEBAR INSTRUCTIONS______________
+# Sidebar
 with st.sidebar:
-    st.header("Instructions")
-    st.info("""
-    **How to get Raw Source:**
-    1. Open email in Gmail/Outlook.
-    2. Click 'More' (three dots).
-    3. Select 'Show Original' or 'View Message Source'.
-    4. Copy the entire text or download the .eml file.
-    """)
+    sidebar_info()
 
-# ───────── HERO SECTION ─────────
-with st.container(horizontal_alignment="center"):
-    st.title("SpamSense AI 📧", text_alignment="center")
-    st.text("SpamSense AI is an intelligent email forensic tool that detects SPAM and analyzes emails in detail.\n It uses advanced machine learning and semantic embeddings to identify suspicious patterns in headers and content." , text_alignment="center")
-    #st.text("It uses advanced machine learning and semantic embeddings to identify suspicious patterns in headers and content.", text_alignment="center")
-    st.image("images/spamsense_ai_2.png")
+# Hero Banner con imagen
+hero_banner()
 
-tab1, tab2 = st.tabs(["Single Email", "Batch Analysis"])
+# Tabs principales
+tab1, tab2 = st.tabs(["🔍 Single Email Analysis", "📊 Batch Analysis"])
 
 # ── SINGLE EMAIL ───────────────────────
 with tab1:
-    st.markdown("### Manual Email Inspection")
+    st.markdown("### Analyze Individual Email")
+    st.markdown("Paste the complete RFC 822 raw source of the email below:")
 
     raw = st.text_area(
-        "Paste full RFC 822 raw source:",
-        height=280
+        "Email Raw Source",
+        height=300,
+        placeholder="Paste email headers and body here...",
+        label_visibility="collapsed"
     )
 
-    if st.button("Analyze Email"):
-        if not raw.strip():
-            st.warning("Please paste email content.")
-        else:
-            with st.spinner("Analyzing email…"):
-                df = processor.transform_raw_email(raw)
-                pred = spam_model.predict(df)[0]
-                prob = spam_model.predict_proba(df)[0][pred]
+    col1, col2, col3 = st.columns([1, 1, 3])
+    with col1:
+        analyze_btn = st.button("🔍 Analyze Email", use_container_width=True, type="primary")
 
-            st.divider()
-            if pred == 1:
-                st.error(f"SPAM DETECTED — Confidence {prob:.2%}")
-            else:
-                st.success(f"LEGITIMATE EMAIL — Confidence {prob:.2%}")
+    if analyze_btn:
+        if not raw.strip():
+            st.warning("⚠️ Please paste email content before analyzing.")
+        else:
+            with st.spinner("🔄 Analyzing email..."):
+                try:
+                    df = processor.transform_raw_email(raw)
+                    pred = spam_model.predict(df)[0]
+                    prob = spam_model.predict_proba(df)[0][pred]
+
+                    label = "SPAM" if pred == 1 else "HAM"
+                    color = COLORS["SPAM"] if pred == 1 else COLORS["HAM"]
+                    
+                    st.markdown("---")
+                    st.markdown(result_card_html(label, prob, color), unsafe_allow_html=True)
+                    
+                    with st.expander("📋 View Technical Details"):
+                        st.dataframe(df.T, use_container_width=True)
+                        
+                except Exception as e:
+                    st.error(f"❌ Error analyzing email: {str(e)}")
 
 # ── BATCH ANALYSIS ─────────────────────
 with tab2:
+    st.markdown("### Batch Email Analysis")
+    st.markdown("Upload multiple .eml or .txt files for comprehensive analysis:")
+
     uploaded = st.file_uploader(
-        "Upload raw email files",
-        accept_multiple_files=True
+        "Upload Email Files",
+        accept_multiple_files=True,
+        type=['eml', 'txt'],
+        label_visibility="collapsed"
     )
 
-    if st.button("Generate Forensic Report") and uploaded:
+    col1, col2, col3 = st.columns([1, 1, 3])
+    with col1:
+        process_btn = st.button("📊 Generate Report", use_container_width=True, type="primary", disabled=not uploaded)
+
+    if process_btn and uploaded:
         results = []
         all_features = []
 
-        with st.spinner("Processing batch…"):
-            for f in uploaded:
-                content = f.getvalue().decode(
-                    "utf-8",
-                    errors="replace"
-                ).replace("\r\n", "\n")
+        progress_bar = st.progress(0)
+        status_text = st.empty()
 
+        for idx, f in enumerate(uploaded):
+            status_text.text(f"Processing {idx + 1}/{len(uploaded)}: {f.name}")
+            progress_bar.progress((idx + 1) / len(uploaded))
+
+            try:
+                content = f.getvalue().decode("utf-8", errors="replace").replace("\r\n", "\n")
                 f_df = processor.transform_raw_email(content)
                 pred = spam_model.predict(f_df)[0]
                 prob = spam_model.predict_proba(f_df)[0][pred]
@@ -258,10 +464,19 @@ with tab2:
                     "confidence": prob,
                     "subject_length": f_df["subject_length"].iloc[0]
                 })
-
                 all_features.append(f_df)
+            except Exception as e:
+                st.warning(f"⚠️ Error processing {f.name}: {str(e)}")
 
-        render_dashboard(
-            pd.DataFrame(results),
-            pd.concat(all_features, ignore_index=True)
-        )
+        progress_bar.empty()
+        status_text.empty()
+
+        if results:
+            st.success(f"✅ Successfully processed {len(results)} emails!")
+            st.markdown("---")
+            render_dashboard(
+                pd.DataFrame(results),
+                pd.concat(all_features, ignore_index=True)
+            )
+        else:
+            st.error("❌ No emails were successfully processed.")
