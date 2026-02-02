@@ -11,8 +11,8 @@
 - 🤖 **Machine Learning Avanzado**: Modelo entrenado con scikit-learn
 - 🧠 **Embeddings Semánticos**: Utiliza Sentence Transformers (all-mpnet-base-v2) para análisis profundo del contenido
 - 📊 **Dashboard Interactivo**: Visualizaciones en tiempo real con Plotly
-- 🔍 **Análisis Forense**: Métricas detalladas de confianza y características del email
-- 📁 **Procesamiento por Lotes**: Carga y analiza múltiples emails desde archivos CSV
+- 🔍 **Análisis Forense**: Métricas detalladas de confianza, IPs, enlaces y dominio del remitente
+- 📁 **Procesamiento por Lotes**: Carga y analiza múltiples emails desde archivos `.eml` o `.txt`
 - 🎨 **Interfaz Moderna**: UI elegante con componentes personalizados y diseño responsive
 - 🐳 **Docker Ready**: Containerización completa para despliegue fácil
 
@@ -84,7 +84,7 @@ La aplicación estará disponible en `http://localhost:8501`
 
 1. **Construir y ejecutar con Docker Compose**
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 2. **Acceder a la aplicación**
@@ -110,15 +110,15 @@ docker-compose restart
 
 ### 2. Análisis por Lotes
 
-1. Ve a la pestaña **"📂 Batch Processing"**
-2. Prepara un archivo CSV con una columna `email` conteniendo los emails completos
-3. Carga el archivo CSV
-4. Haz clic en **"Process Batch"**
-5. Explora el dashboard forense con:
-   - Distribución de SPAM vs HAM
-   - Análisis de confianza
-   - Correlaciones de características
-   - Top features más importantes
+1. Ve a la pestaña **"📊 Batch Analysis"**
+2. Sube múltiples archivos **`.eml`** o **`.txt`**
+3. Haz clic en **"📊 Generate Report"**
+4. Explora el dashboard forense con:
+  - Distribución de SPAM vs HAM
+  - Análisis de confianza
+  - Mapas de origen por IP y enlaces detectados
+  - Pasaporte de dominio (RDAP)
+5. Descarga el reporte con **"Download Full Forensic CSV"**
 
 ---
 
@@ -144,7 +144,8 @@ Aplicación principal con:
 - Carga de modelos (con caché)
 - Interfaz de tabs para análisis individual y batch
 - Dashboard forense con Plotly
-- Gestión de estado de sesión
+- Sección forense: IPs, enlaces y pasaporte de dominio (RDAP)
+- Exportación de evidencia en CSV
 
 #### 3. **components.py**
 Componentes UI reutilizables:
@@ -199,5 +200,6 @@ El dashboard muestra métricas clave:
 ## 🔒 Consideraciones de Seguridad
 
 - ⚠️ No envíes información sensible o credenciales en los emails de prueba
-- 🔐 La aplicación procesa los emails localmente (no se envían a servicios externos)
+- 🔐 El contenido del email se procesa localmente para la clasificación
+- 🌐 Para análisis forense, se consultan servicios externos (RDAP y geolocalización IP)
 - 📊 Los datos del modelo están cacheados localmente en `model_cache/`
