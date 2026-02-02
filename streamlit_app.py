@@ -3,6 +3,9 @@ import joblib
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import re
+import requests
+from datetime import datetime, timezone
 from sentence_transformers import SentenceTransformer
 from emailProcessor import EmailProcessor
 
@@ -33,6 +36,109 @@ def load_assets():
 spam_model, emb_model = load_assets()
 processor = EmailProcessor(emb_model)
 
+# ───────────────── IP FUNCTIONS ─────────────────
+def extract_forensics(raw_text):
+    """Extracts IP, URLs and Domain from remitter."""
+    ip_match = re.search(r'Received: from .*? \[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]', raw_text)
+    ip = ip_match.group(1) if ip_match else None
+    urls = list(set(re.findall(r'https?://[^\s<>"]+|www\.[^\s<>"]+', raw_text)))
+    
+    domain = None
+    from_match = re.search(r'From:.*@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', raw_text)
+    if from_match:
+        domain = from_match.group(1)
+    return ip, urls, domain
+
+@st.cache_data
+def get_domain_age_rdap(domain):
+    """Checks domain age."""
+    if not domain: return "N/A"
+    try:
+        response = requests.get(f"https://rdap.net/domain/{domain}", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            events = data.get("events", [])
+            for event in events:
+                if event.get("eventAction") == "registration":
+                    date_str = event.get("eventDate")
+                    creation_date = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                    age = datetime.now(timezone.utc) - creation_date
+                    years = age.days // 365
+                    days = age.days % 365
+                    return f"{years}a, {days}d"
+        return "Unknown"
+    except:
+        return "Error RDAP"
+
+@st.cache_data
+def get_geo_info(ip):
+    if not ip: return None
+    try:
+        res = requests.get(f"http://ip-api.com/json/{ip}?fields=status,country,city,lat,lon,isp", timeout=5)
+        return res.json() if res.json().get("status") == "success" else None
+    except: return None
+
+# ───────────────── IP COMPONENTS ─────────────────
+def render_forensic_section(df_results):
+    st.subheader("🌐 Forensic Analysis")
+    
+    # --- IP Process ---
+    ips = df_results[df_results["ip"].notnull()]["ip"].unique()
+    map_points = []
+    detected_cities = []
+    
+    for ip in ips:
+        geo = get_geo_info(ip)
+        if geo:
+            map_points.append({"lat": geo["lat"], "lon": geo["lon"], "IP": ip})
+            detected_cities.append(f"{geo['city']} ({geo['country']})")
+    
+    unique_cities = list(set(detected_cities))
+
+    # --- Line 1: Maps and Links ---
+    col_map, col_links = st.columns([1.5, 1])
+    
+    with col_map:
+        st.write("**Origin Map & Locations**")
+        if map_points:
+            st.map(pd.DataFrame(map_points))
+            cities_str = ", ".join(unique_cities) if unique_cities else "Unknown"
+            st.markdown(f"🏙️ *{cities_str}*")
+        else:
+            st.info("No IPs detected for mapping.")
+
+    with col_links:
+        st.write("**Body Links**")
+        all_urls = [url for sublist in df_results["urls"] for url in sublist if sublist]
+        if all_urls:
+            url_counts = pd.Series(all_urls).value_counts().reset_index()
+            url_counts.columns = ["URL", "Count"]
+            st.dataframe(url_counts, hide_index=True, width='stretch')
+        else:
+            st.success("No links found in message body.")
+
+    st.divider()
+
+    # --- Line 2: SENDER DOMAIN PASSPORT ---
+    st.write("**Sender Domain Passport (RDAP)**")
+    domains = df_results[df_results["domain"].notnull()]["domain"].unique()
+    
+    if len(domains) > 0:
+        d_cols = st.columns(min(len(domains), 3))
+        for i, dom in enumerate(domains):
+            if i < 6: 
+                with d_cols[i % 3]:
+                    age = get_domain_age_rdap(dom)
+                    st.code(f"Domain: {dom}\nAge: {age}")
+        if len(domains) > 6:
+            st.caption(f"Y {len(domains)-6} most used domains.")
+    else:
+        st.info("No sender domains detected for analysis.")
+    
+    st.markdown("---")
+
+
+
 # ───────────────── DASHBOARD ─────────────────
 def render_dashboard(batch_df, features_df):
     st.markdown("## 📊 Forensic Analysis Dashboard")
@@ -58,6 +164,8 @@ def render_dashboard(batch_df, features_df):
         metric_card("Avg Confidence", f"{avg_conf:.1%}", COLORS["SECONDARY"], "🎯")
 
     st.markdown("---")
+
+    render_forensic_section(batch_df)
 
     # Visualizaciones principales
     col1, col2 = st.columns([1, 1])
@@ -134,6 +242,7 @@ def render_dashboard(batch_df, features_df):
             legend=dict(font=dict(size=13, color='#1E293B'))
         )
         st.plotly_chart(fig, use_container_width=True)
+        
 
     st.markdown("---")
 
@@ -412,15 +521,21 @@ with tab1:
                     df = processor.transform_raw_email(raw)
                     pred = spam_model.predict(df)[0]
                     prob = spam_model.predict_proba(df)[0][pred]
+                    ip, urls, domain = extract_forensics(raw)
+                    single_df = pd.DataFrame([{"ip": ip, "urls": urls, "domain": domain}])
 
                     label = "SPAM" if pred == 1 else "HAM"
                     color = COLORS["SPAM"] if pred == 1 else COLORS["HAM"]
                     
                     st.markdown("---")
                     st.markdown(result_card_html(label, prob, color), unsafe_allow_html=True)
+
+                    render_forensic_section(single_df)
                     
                     with st.expander("📋 View Technical Details"):
                         st.dataframe(df.T, use_container_width=True)
+
+
                         
                 except Exception as e:
                     st.error(f"❌ Error analyzing email: {str(e)}")
@@ -457,11 +572,13 @@ with tab2:
                 f_df = processor.transform_raw_email(content)
                 pred = spam_model.predict(f_df)[0]
                 prob = spam_model.predict_proba(f_df)[0][pred]
+                ip, urls, domain = extract_forensics(content)
 
                 results.append({
                     "name": f.name,
                     "label": "SPAM" if pred else "HAM",
                     "confidence": prob,
+                    "ip": ip, "urls": urls, "domain": domain,
                     "subject_length": f_df["subject_length"].iloc[0]
                 })
                 all_features.append(f_df)
@@ -474,9 +591,23 @@ with tab2:
         if results:
             st.success(f"✅ Successfully processed {len(results)} emails!")
             st.markdown("---")
+            df_final_results = pd.DataFrame(results)
             render_dashboard(
-                pd.DataFrame(results),
+                df_final_results,
                 pd.concat(all_features, ignore_index=True)
             )
+
+            # RESULTS EXPORT
+            st.divider()
+            st.subheader("📁 Export Evidence")
+            export_df = df_final_results.copy()
+            export_df["urls"] = export_df["urls"].apply(lambda x: ", ".join(x))
+            csv = export_df.to_csv(index=False).encode('utf-8')
+            st.download_button("Download Full Forensic CSV", data=csv, file_name=f"forensic_report_{datetime.now().year}.csv", mime='text/csv')
+
         else:
             st.error("❌ No emails were successfully processed.")
+
+
+
+            
