@@ -1,6 +1,7 @@
 # 📧 SpamSense AI
 
 ![SpamSense AI Banner](assets/showcase/thumbnails/spamsense_banner.jpg)
+[Aplicación desplegada](https://spamsense-ai-dxzze6ukyji2qg6ysxvkcn.streamlit.app/)
 
 ## 🎯 Descripción
 
