@@ -1,6 +1,6 @@
 # 📧 SpamSense AI
 
-![SpamSense AI Banner](images/spamsense_banner.jpg)
+![SpamSense AI Banner](assets/showcase/thumbnails/spamsense_banner.jpg)
 
 ## 🎯 Descripción
 
@@ -203,3 +203,26 @@ El dashboard muestra métricas clave:
 - 🔐 El contenido del email se procesa localmente para la clasificación
 - 🌐 Para análisis forense, se consultan servicios externos (RDAP y geolocalización IP)
 - 📊 Los datos del modelo están cacheados localmente en `model_cache/`
+
+---
+
+## Aplicación final
+### Análisis de email individual
+1. Espacio de análisis
+![Img1](assets/showcase/readme/readme1.png)
+2. Resultado de análisis y localización origen junto con links incluidos en el email
+![Img2](assets/showcase/readme/readme2.png)
+3. Edad del dominio (bloqueado) y datos técnicos del análisis
+![Img3](assets/showcase/readme/readme3.png)
+4. En caso de estar disponible la información del dominio, podremos observar su edad
+![Img4](assets/showcase/readme/readme9.png)
+
+### Análisis de emails
+1. Espacio de carga de emails
+![Img4](assets/showcase/readme/readme4.png)
+2. Resultados generales, localizaciones de origen y links usados
+![Img5](assets/showcase/readme/readme5.png)
+3. Análisis general
+![Img6](assets/showcase/readme/readme6.png)
+![Img6](assets/showcase/readme/readme7.png)
+![Img6](assets/showcase/readme/readme8.png)
