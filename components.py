@@ -89,7 +89,7 @@ def hero_banner():
         # Contenedor centrado para la imagen
         col1, col2, col3 = st.columns([0.5, 4, 0.5])
         with col2:
-            st.image("images/spamsense_banner.jpg", use_container_width=True)
+            st.image("assets/showcase/thumbnails/spamsense_banner.jpg", use_container_width=True)
     except:
         # Fallback si no existe la imagen
         st.markdown("""
